@@ -19,6 +19,7 @@ void proc1() {
  // Critical section
  gSharedCounter++;
  // Let the other task run
+ asm volatile ("mfence" ::: "memory");
  flag1 = 0;
 }
 
@@ -29,6 +30,7 @@ while((flag1 == 1) && (turn == 1)) ;
 // critical section
  gSharedCounter++;
  // leave critical section
+ asm volatile ("mfence" ::: "memory");
   flag2 = 0;
 }
 //
