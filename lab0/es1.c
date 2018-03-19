@@ -15,22 +15,22 @@ int gloopCount;
 void proc1() {
  flag1 = 1;
  turn = 2;
+ asm volatile ("mfence":::"memory");
  while((flag2 == 1) && (turn == 2)) ;
  // Critical section
  gSharedCounter++;
  // Let the other task run
- asm volatile ("mfence" ::: "memory");
  flag1 = 0;
 }
 
 void proc2() {
 flag2 = 1;
 turn = 1;
+ asm volatile ("mfence":::"memory");
 while((flag1 == 1) && (turn == 1)) ;
 // critical section
  gSharedCounter++;
  // leave critical section
- asm volatile ("mfence" ::: "memory");
   flag2 = 0;
 }
 //
