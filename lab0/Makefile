@@ -11,3 +11,6 @@ ${PC}.out: ${PC}.c | ${BIN}
 
 ${E1}.out: ${E1}.c | ${BIN}
 	gcc ${PFLAG} ${BIN}/$@ $< 
+
+${E2}.out: ${E2}.c | ${BIN}
+	gcc ${PFLAG} ${BIN}/$@ $< 
