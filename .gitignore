@@ -1,3 +1,7 @@
+# IntelliJ stuff
+*.iml
+.idea
+
 # Prerequisites
 *.d
 
