@@ -34,6 +34,11 @@ public class ConnectionPoolClass {
         System.out.println(html);
     }
 
+    public void resetWith(int n){
+        StopPool();
+        pool = Executors.newFixedThreadPool(n);
+    }
+
     // create a callable and submit it to pool:
     public Future<Integer> OpenConnection(String myUrl) throws Exception{
         class connectionCaller implements Callable<Integer>{
@@ -41,17 +46,31 @@ public class ConnectionPoolClass {
                 URL url = new URL(myUrl);
                 HttpURLConnection connection = (HttpURLConnection) url.openConnection();
                 connection.setRequestMethod("GET");
-                printHtml(connection.getInputStream());
+                //printHtml(connection.getInputStream());
                 return connection.getResponseCode();
             }
         }
-        System.err.print("creating callable:");
         connectionCaller mycallable = new connectionCaller();
-        System.err.println("DONE");
         return pool.submit(mycallable);
     }
     void StopPool(){
-        System.err.println("Stopping pool");
-        pool.shutdown();
+        pool.shutdown(); // Asking gently to stop the fuckinfg operation ypu bitch.
+        try {
+            // Wait a while for the bitch to exit (I know where you live...)
+            if (!pool.awaitTermination(10, TimeUnit.SECONDS)) {
+                pool.shutdownNow(); // Killing the bitch
+                // Wait a while for the bitch
+                if (!pool.awaitTermination(10, TimeUnit.SECONDS))
+                    System.err.println("Pool did not terminate");
+            }
+        } catch (InterruptedException ie) {
+            // (Re-)Cancel if current thread also interrupted
+            pool.shutdownNow();
+            // Preserve interrupt status
+            Thread.currentThread().interrupt();
+        }
+        finally {
+            pool.shutdownNow();
+        }
     }
 }
