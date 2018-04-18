@@ -1,6 +1,8 @@
 package ConnectionPool;
 
 import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -15,6 +17,23 @@ public class ConnectionPoolClass {
         pool = Executors.newFixedThreadPool(poolSize);
     }
 
+    private void printHtml(InputStream in){
+        BufferedReader read = new BufferedReader(new InputStreamReader(in));
+        String line = null;
+        String html = "";
+        try {
+            line = read.readLine();
+            while(line!=null) {
+                html += line;
+                html+='\n';
+                line = read.readLine();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        System.out.println(html);
+    }
+
     // create a callable and submit it to pool:
     public Future<Integer> OpenConnection(String myUrl) throws Exception{
         class connectionCaller implements Callable<Integer>{
@@ -22,15 +41,7 @@ public class ConnectionPoolClass {
                 URL url = new URL(myUrl);
                 HttpURLConnection connection = (HttpURLConnection) url.openConnection();
                 connection.setRequestMethod("GET");
-                BufferedReader read = new BufferedReader(new InputStreamReader(connection.getInputStream()));
-                String line = read.readLine();
-                String html = "";
-                while(line!=null) {
-                    html += line;
-                    html+='\n';
-                    line = read.readLine();
-                }
-                System.out.println(html);
+                printHtml(connection.getInputStream());
                 return connection.getResponseCode();
             }
         }
