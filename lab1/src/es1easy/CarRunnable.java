@@ -3,7 +3,7 @@ package es1easy;
 import es1.ParkingLotClass;
 
 import java.util.Random;
-
+// Adding a comment to test discord webhook;
 public class CarRunnable extends Thread{
     private ParkingLotClass myPark;
     private static int identifier=0;
