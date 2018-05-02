@@ -9,12 +9,27 @@ import java.net.URL;
 import java.util.concurrent.*;
 
 public class ConnectionPoolClass {
-    private ExecutorService pool;
 
+    protected class connectionCaller implements Callable<Integer>{
+        private URL url;
+        public connectionCaller(String myURL) throws Exception{
+            url = new URL(myURL);
+        }
+        public Integer call() throws Exception {
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("GET");
+            //printHtml(connection.getInputStream());
+            return connection.getResponseCode();
+        }
+    }
+
+    private ExecutorService pool;
+    private ConcurrentHashMap<String, connectionCaller> cache;
 
     // maybe I should define a constructor?
     public ConnectionPoolClass(int poolSize){
         pool = Executors.newFixedThreadPool(poolSize);
+        cache = new ConcurrentHashMap<>();
     }
 
     private void printHtml(InputStream in){
@@ -41,18 +56,13 @@ public class ConnectionPoolClass {
 
     // create a callable and submit it to pool:
     public Future<Integer> OpenConnection(String myUrl) throws Exception{
-        class connectionCaller implements Callable<Integer>{
-            public Integer call() throws Exception {
-                URL url = new URL(myUrl);
-                HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-                connection.setRequestMethod("GET");
-                //printHtml(connection.getInputStream());
-                return connection.getResponseCode();
-            }
-        }
-        connectionCaller mycallable = new connectionCaller();
+        connectionCaller mycallable = (cache.containsKey(myUrl)? cache.get(myUrl) : new connectionCaller(myUrl));
+        System.out.println((cache.containsKey(myUrl)? "Connection to "+myUrl+" already exists" : "A new connection to "+myUrl+" has been created"));
+        cache.putIfAbsent(myUrl, mycallable);
         return pool.submit(mycallable);
     }
+
+
     void StopPool(){
         pool.shutdown(); // Asking gently to stop the fuckinfg operation ypu bitch.
         try {
