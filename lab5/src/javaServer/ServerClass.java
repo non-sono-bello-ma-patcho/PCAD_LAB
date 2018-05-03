@@ -4,11 +4,10 @@ import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.StringTokenizer;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.*;
 
 public class ServerClass {
     private ServerSocket listener;
@@ -35,81 +34,124 @@ public class ServerClass {
         }
 
         @Override
-        public String call() {
+        public String call() throws IOException {
             String response = null;
             try {
                 // open streams so client and server can communicate:
                 BufferedReader bIn = new BufferedReader(new InputStreamReader(client.getInputStream())); // buffered inpustream was too difficult to manage for this purpose;
-                BufferedWriter bOut = new BufferedWriter(new OutputStreamWriter(client.getOutputStream())); // have method similar to BufferedReader...
+                PrintWriter bOut = new PrintWriter(client.getOutputStream(), true); // have method similar to BufferedReader...
                 // tell client Server is ready to receive userID:
                 bOut.write("ACC\n");
-                // try to retrive request:
+                bOut.flush();
                 String req = bIn.readLine(); // get the request line:
                 StringTokenizer st = new StringTokenizer(req); // creates token out of a string:
                 // parse token:
                 switch(st.nextToken()){
-                    case "SIGN UP":
-                        if(addUser(st.nextToken())){
-                            // send acknowledgement message:
-                            bOut.write("Signed up successfully\n");
+                    case "SIGN":
+                        switch(st.nextToken()) {
+                            case "UP":
+                                if (addUser(st.nextToken())) {
+                                    // send acknowledgement message:
+                                    response ="SIGN UP SUCCESS\n";
+                                } else {
+                                    // send acknowledgement message:
+                                    response = "SIGN UP FAIL\n";
+                                }
+                                break;
+                            case "OFF":
+                                if (delUser(st.nextToken())) {
+                                    // send acknowledgement message:
+                                    response = "SIGN OFF SUCCESS\n";
+                                } else {
+                                    // send acknowledgement message:
+                                    response = "SIGN OFF FAIL\n";
+                                }
+                                break;
+                            default:
+                                response = "BAD REQUEST. CLOSING CONNECTION\n";
                         }
-                        else{
-                            // send acknowledgement message:
-                            bOut.write("Impossible to be signed up\n");
-                        }
-                        break;
-                    case "SIGN OFF":
-                        if(delUser(st.nextToken())){
-                            // send acknowledgement message:
-                            bOut.write("Signed off successfully\n");
-                        }
-                        else{
-                            // send acknowledgement message:
-                            bOut.write("Impossible to sign off, no such user in server\n");
-                        }
-                        break;
                     case "CONNECT":
                         // poi lo faccio, giuro;
                         break;
                     default:
-                        bOut.write("BAD REQUEST. CLOSING CONNECTION\n");
-                        client.close();
+                        response = "BAD REQUEST. CLOSING CONNECTION\n";
                 }
+                bOut.write(response);
                 bOut.flush();
-                client.close();
             }
             catch(Exception e){
                 e.printStackTrace();
             }
+            client.close();
+            System.err.println("DONE");
             return response;
         }
-    }
-
-    private boolean timeExpired(){
-        return false;
     }
 
     public ServerClass() throws IOException {
         pool = Executors.newFixedThreadPool(5);
         listener = new ServerSocket(9000);
-        listener.setSoTimeout(10000);
+        clientList = new ArrayList<>();
+        listener.setReuseAddress(true);
     }
 
-    public void start(){
-        try{
-            connection = listener.accept();
-            while(!timeExpired()){
-                // pass connection to a thread:
+    public ServerClass(int timeout) throws IOException {
+        this();
+        listener.setSoTimeout(timeout*1000);
+    }
 
-                connectionManager cm = new connectionManager(connection);
-                pool.submit(cm);
+    public Future<String> openConnection(Socket accepted) throws IOException {
+        // pass connection to a thread:
+        connectionManager cm = new connectionManager(accepted);
+        return pool.submit(cm);
+    }
+
+    public void start() throws IOException, ExecutionException, InterruptedException {
+        List<Future<String>> threads = new ArrayList<>();
+        try{
+            System.err.println("SERVER:\tStarting to listen on port 9000...");
+            while(true){
+                Socket conn = listener.accept();
+                threads.add(openConnection(conn));
             }
         }
-        catch (SocketTimeoutException e){
-            System.err.println("Time expired... Closing connections...");
+        catch (SocketTimeoutException e) {
+            System.err.println("SERVER:\tTime expired... Closing connections...");
+            if (!clientList.isEmpty()) {
+                System.out.println("REGISTERED USERS:");
+                for (String u : clientList) System.out.println(u);
+            }
+            else System.err.println("No users registered");
+            for (Future<String> f: threads) {
+                f.get();
+            }
+            StopPool();
+            listener.close();
         }
         catch (IOException e) {
             e.printStackTrace();
+        }
+
+    }
+
+    public void StopPool(){
+        pool.shutdown(); // Asking gently to stop the fuckinfg operation ypu bitch.
+        try {
+            // Wait a while for the bitch to exit (I know where you live...)
+            if (!pool.awaitTermination(10, TimeUnit.SECONDS)) {
+                pool.shutdownNow(); // Killing the bitch
+                // Wait a while for the bitch
+                if (!pool.awaitTermination(10, TimeUnit.SECONDS))
+                    System.err.println("Pool did not terminate");
+            }
+        } catch (InterruptedException ie) {
+            // (Re-)Cancel if current thread also interrupted
+            pool.shutdownNow();
+            // Preserve interrupt status
+            Thread.currentThread().interrupt();
+        }
+        finally {
+            pool.shutdownNow();
         }
     }
 }
